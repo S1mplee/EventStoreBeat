@@ -1,0 +1,5 @@
+= Eventstorebeat Docs
+
+Welcome to the Eventstorebeat documentation.
+
+
