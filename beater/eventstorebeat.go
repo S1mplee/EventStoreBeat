@@ -1,14 +1,15 @@
 package beater
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/S1mplee/eventstorebeat/config"
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
-
-	"github.com/S1mplee/eventstorebeat/config"
+	"github.com/vectorhacker/goro"
 )
 
 // Eventstorebeat configuration.
@@ -42,8 +43,43 @@ func (bt *Eventstorebeat) Run(b *beat.Beat) error {
 		return err
 	}
 
+	client := goro.Connect("http://localhost:2113", goro.WithBasicAuth("admin", "changeit"))
+
+	ctx := context.Background()
+	reader := client.FowardsReader("$streams")
+	catchupSubscription := client.CatchupSubscription("$streams", 0) // start from 0
+
+	go func() {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		messages := catchupSubscription.Subscribe(ctx)
+
+		for message := range messages {
+			if err := message.Error; err != nil {
+				return
+			}
+
+			event2 := beat.Event{
+				Timestamp: time.Now(),
+				Fields: common.MapStr{
+					"type":        b.Info.Name,
+					"eventType":   message.Event.Type,
+					"eventID":     message.Event.ID,
+					"eventAuthor": message.Event.Author,
+					"eventData":   string(message.Event.Data),
+				},
+			}
+
+			bt.client.Publish(event2)
+		}
+	}()
+
+	events, err := reader.Read(ctx, 0, 1)
+	if err != nil {
+		panic(err)
+	}
+
 	ticker := time.NewTicker(bt.config.Period)
-	counter := 1
 	for {
 		select {
 		case <-bt.done:
@@ -54,14 +90,13 @@ func (bt *Eventstorebeat) Run(b *beat.Beat) error {
 		event := beat.Event{
 			Timestamp: time.Now(),
 			Fields: common.MapStr{
-				"type":    b.Info.Name,
-				"counter": counter,
+				"type":   b.Info.Name,
+				"events": events,
 			},
 		}
 		bt.client.Publish(event)
-		logp.Info("Event sent")
-		counter++
 	}
+
 }
 
 // Stop stops eventstorebeat.
