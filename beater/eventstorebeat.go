@@ -22,6 +22,7 @@ type Eventstorebeat struct {
 // New creates an instance of eventstorebeat.
 func New(b *beat.Beat, cfg *common.Config) (beat.Beater, error) {
 	c := config.DefaultConfig
+
 	if err := cfg.Unpack(&c); err != nil {
 		return nil, fmt.Errorf("Error reading config file: %v", err)
 	}
@@ -43,11 +44,11 @@ func (bt *Eventstorebeat) Run(b *beat.Beat) error {
 		return err
 	}
 
-	client := goro.Connect("http://localhost:2113", goro.WithBasicAuth("admin", "changeit"))
+	client := goro.Connect(bt.config.Brokers[0], goro.WithBasicAuth(bt.config.Username, bt.config.Password))
 
 	ctx := context.Background()
-	reader := client.FowardsReader("$streams")
-	catchupSubscription := client.CatchupSubscription("$streams", 0) // start from 0
+	reader := client.FowardsReader(bt.config.Stream)
+	catchupSubscription := client.CatchupSubscription(bt.config.Stream, 0) // start from 0
 
 	go func() {
 		ctx, cancel := context.WithCancel(ctx)
@@ -79,23 +80,11 @@ func (bt *Eventstorebeat) Run(b *beat.Beat) error {
 		panic(err)
 	}
 
-	ticker := time.NewTicker(bt.config.Period)
-	for {
-		select {
-		case <-bt.done:
-			return nil
-		case <-ticker.C:
-		}
-
-		event := beat.Event{
-			Timestamp: time.Now(),
-			Fields: common.MapStr{
-				"type":   b.Info.Name,
-				"events": events,
-			},
-		}
-		bt.client.Publish(event)
+	for _, event := range events {
+		fmt.Printf("%s\n", event.Data)
 	}
+
+	return nil
 
 }
 

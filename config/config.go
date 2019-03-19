@@ -3,12 +3,16 @@
 
 package config
 
-import "time"
-
 type Config struct {
-	Period time.Duration `config:"period"`
+	Brokers  []string `config:"brokers"`
+	Stream   string   `config:"stream"`
+	Password string   `config:"password"`
+	Username string   `config:"username"`
 }
 
 var DefaultConfig = Config{
-	Period: 1 * time.Second,
+	Brokers:  []string{"http://localhost:2113"},
+	Stream:   "$ce-holdings.allModels",
+	Password: "changeit",
+	Username: "admin",
 }

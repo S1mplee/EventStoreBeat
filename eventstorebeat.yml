@@ -1,3 +1,13 @@
-output.file:
-  path: "./tmp/files"
-  filename: filebeat
+eventstorebeat:
+  # Brokers to connect to.
+  # Defaults to ["localhost:9092"].
+  brokers: ["http://localhost:2113"]
+  #stream to listen
+  stream: "$ce-holdings.allModels"
+  #eventstore config
+  username: "admin"
+  password: "changeit"
+
+output.logstash:
+  hosts: ["127.0.0.1:6256"]
+  
